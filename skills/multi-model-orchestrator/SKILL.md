@@ -8,23 +8,22 @@ description: "Use when a project has the AI Orchestrator toolkit installed and t
 Use this skill when the current project contains an AI Orchestrator install, usually:
 
 ```text
-.ai-orchestrator/
+{{AI_ORCHESTRATOR_DIR}}/
 ```
 
 ## Quick Start
 
-1. Check for `.ai-orchestrator/AGENT_RULES.md`.
+1. Check for `{{AI_ORCHESTRATOR_DIR}}/AGENT_RULES.md`.
 2. Read it before calling any external model wrapper.
 3. Use wrappers instead of raw CLI commands.
 
 Installed wrapper paths:
 
 ```text
-.ai-orchestrator/bin/codex-review
-.ai-orchestrator/bin/ask-gemini
-.ai-orchestrator/bin/gemini-image
-.ai-orchestrator/bin/nano-banana-image
-.ai-orchestrator/bin/codex-image
+{{AI_ORCHESTRATOR_DIR}}/bin/codex-review
+{{AI_ORCHESTRATOR_DIR}}/bin/ask-gemini
+{{AI_ORCHESTRATOR_DIR}}/bin/gemini-image
+{{AI_ORCHESTRATOR_DIR}}/bin/codex-image
 ```
 
 If working in the toolkit source repo, use:
@@ -33,7 +32,6 @@ If working in the toolkit source repo, use:
 orchestrator/bin/codex-review
 orchestrator/bin/ask-gemini
 orchestrator/bin/gemini-image
-orchestrator/bin/nano-banana-image
 orchestrator/bin/codex-image
 ```
 
@@ -41,8 +39,7 @@ orchestrator/bin/codex-image
 
 - Repo-aware code review: `codex-review`
 - Gemini reasoning or product/architecture consultation: `ask-gemini`
-- Gemini-generated image asset: `gemini-image`
-- Nano-banana image request: `nano-banana-image` (Gemini image alias)
+- Gemini-generated image asset, including nano-banana requests: `gemini-image`
 - OpenAI/Codex-generated image asset: `codex-image`
 
 ## Safety
@@ -55,7 +52,7 @@ orchestrator/bin/codex-image
 
 ## Missing Toolkit
 
-If `.ai-orchestrator/` is missing, tell the user the toolkit is not installed in this project and suggest installing it from the source repo with:
+If `{{AI_ORCHESTRATOR_DIR}}/` is missing, tell the user the toolkit is not installed in this project and suggest installing it from the source repo with:
 
 ```bash
 ./install.sh /path/to/project

@@ -9,10 +9,9 @@ The goal is simple: install a small toolkit into any project, then let the prima
 - Repo-aware Codex review through `codex-review`
 - Gemini reasoning consultation through `ask-gemini`
 - Gemini image generation through `gemini-image`
-- Nano-banana image generation through `nano-banana-image` as a Gemini image alias
+- Nano-banana and other Gemini image-model requests routed through `gemini-image`
 - Codex/OpenAI image generation through `codex-image`
-- Thin `CLAUDE.md` and optional `GEMINI.md` templates
-- Optional Codex skill instructions under `skills/multi-model-orchestrator`
+- Claude Code skill instructions under `.claude/skills/multi-model-orchestrator`
 
 ## Layout
 
@@ -24,11 +23,7 @@ orchestrator/
     codex-review
     ask-gemini
     gemini-image
-    nano-banana-image
     codex-image
-templates/
-  CLAUDE.md
-  GEMINI.md
 skills/
   multi-model-orchestrator/
     SKILL.md
@@ -56,7 +51,7 @@ From this source repo:
 ./install.sh /path/to/project
 ```
 
-From GitHub after publishing:
+From GitHub:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash -s -- /path/to/project --repo OWNER/REPO
@@ -68,7 +63,7 @@ Install the latest tagged release or a branch:
 curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash -s -- . --repo OWNER/REPO --ref v0.1.0
 ```
 
-Future npm flow after publishing:
+From npm:
 
 ```bash
 npx @yedidya-dan/ai-orc install .
@@ -84,25 +79,13 @@ This installs:
 
 ```text
 /path/to/project/.ai-orchestrator/
-/path/to/project/CLAUDE.md
+/path/to/project/.claude/skills/multi-model-orchestrator/SKILL.md
 ```
 
-If the target project already has `CLAUDE.md`, the installer keeps it and writes:
-
-```text
-CLAUDE.ai-orchestrator.md
-```
-
-Install optional Gemini project instructions:
+Install only the wrappers, without the Claude skill:
 
 ```bash
-./install.sh /path/to/project --with-gemini-md
-```
-
-Replace existing agent files only when you mean to:
-
-```bash
-./install.sh /path/to/project --force-agent-files
+./install.sh /path/to/project --no-skill
 ```
 
 ## Usage In An Installed Project
@@ -127,10 +110,10 @@ Generate an image through Gemini:
   --output generated-images/orchestrator-dashboard.png
 ```
 
-Generate an image through the nano-banana alias. This uses Gemini image generation with YOLO enabled:
+For nano-banana or any other Gemini image-model request, use Gemini image generation. If Gemini's image MCP needs broader permissions, add `--yolo`:
 
 ```bash
-.ai-orchestrator/bin/nano-banana-image \
+.ai-orchestrator/bin/gemini-image --yolo \
   --prompt "An astronaut cat floating in space, cinematic lighting, no text" \
   --output generated-images/astronaut-cat.png
 ```
@@ -157,7 +140,6 @@ Generate an image through Codex/OpenAI:
 - `ask-gemini` does not enable auto-approval.
 - `gemini-image` may write one requested image file.
 - `gemini-image --yolo` enables Gemini full auto-approval and skips Gemini sandboxing; use it only for explicit image-generation requests.
-- `nano-banana-image` delegates to `gemini-image --yolo`.
 - `codex-image` runs Codex in workspace-write mode so it can save the requested image file.
 - No general act/write workflow exists yet.
 
@@ -169,7 +151,7 @@ When working in this source repo, use:
 orchestrator/bin/codex-review --prompt "Review the toolkit structure."
 orchestrator/bin/ask-gemini --prompt "Review the portability tradeoffs."
 orchestrator/bin/gemini-image --prompt "A test image" --output generated-images/gemini-test.png
-orchestrator/bin/nano-banana-image --prompt "A test image" --output generated-images/nano-banana-test.png
+orchestrator/bin/gemini-image --yolo --prompt "A nano-banana style test image" --output generated-images/nano-banana-test.png
 orchestrator/bin/codex-image --prompt "A test image" --output generated-images/codex-test.png
 ```
 
@@ -178,23 +160,20 @@ The root `bin/` directory is kept as a compatibility alias while the package mat
 ## Next Power-Ups
 
 1. Add logging for every consultation.
-2. Add prompt templates.
+2. Add reusable prompt presets inside the skill.
 3. Add a guarded `codex-act` workflow with explicit user approval.
 4. Add a config-aware router command.
-5. Publish as a GitHub repo with an install URL.
-6. Publish an npm package for `npx @yedidya-dan/ai-orc install .`.
+5. Add optional skill installers for other agent ecosystems.
 
 ## Publishing Checklist
 
-1. Create a GitHub repository, for example `OWNER/ai-orchestrator`.
-2. Push this source repo.
-3. Test remote install:
+1. Test remote install:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/OWNER/ai-orchestrator/main/install.sh | bash -s -- /tmp/test-project --repo OWNER/ai-orchestrator
 ```
 
-4. Optionally publish to npm after the GitHub install path is stable:
+2. Publish to npm:
 
 ```bash
 npm publish

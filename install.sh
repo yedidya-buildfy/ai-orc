@@ -8,26 +8,26 @@ Usage:
 
 Options:
   --target-dir NAME       Install toolkit into NAME. Default: .ai-orchestrator
+  --skill-dir NAME        Install the Claude skill into NAME. Default: .claude/skills
+  --no-skill              Do not install the Claude skill.
   --repo OWNER/REPO       GitHub repo to download when running install.sh without local source files.
   --ref REF               Git ref to download for remote installs. Default: main
-  --force-agent-files     Replace existing CLAUDE.md or GEMINI.md.
-  --with-gemini-md        Also install GEMINI.md.
   --help, -h              Show this help.
 
 Examples:
   ./install.sh /path/to/project
-  ./install.sh . --with-gemini-md
   ./install.sh /path/to/project --target-dir .tools/ai-orchestrator
+  ./install.sh /path/to/project --skill-dir .claude/skills
   curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash -s -- . --repo OWNER/REPO
 USAGE
 }
 
 target_project="."
 target_dir=".ai-orchestrator"
+skill_dir=".claude/skills"
+install_skill=1
 remote_repo="${AI_ORCHESTRATOR_REPO:-}"
 remote_ref="${AI_ORCHESTRATOR_REF:-main}"
-force_agent_files=0
-with_gemini_md=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -38,6 +38,18 @@ while [[ $# -gt 0 ]]; do
       fi
       target_dir="$2"
       shift 2
+      ;;
+    --skill-dir)
+      if [[ $# -lt 2 ]]; then
+        echo "install.sh: --skill-dir requires a value" >&2
+        exit 2
+      fi
+      skill_dir="$2"
+      shift 2
+      ;;
+    --no-skill)
+      install_skill=0
+      shift
       ;;
     --repo)
       if [[ $# -lt 2 ]]; then
@@ -54,14 +66,6 @@ while [[ $# -gt 0 ]]; do
       fi
       remote_ref="$2"
       shift 2
-      ;;
-    --force-agent-files)
-      force_agent_files=1
-      shift
-      ;;
-    --with-gemini-md)
-      with_gemini_md=1
-      shift
       ;;
     --help|-h)
       usage
@@ -81,7 +85,7 @@ done
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P || pwd)"
 source_dir="$script_dir/orchestrator"
-template_dir="$script_dir/templates"
+skill_source_dir="$script_dir/skills/multi-model-orchestrator"
 tmp_source_dir=""
 
 cleanup() {
@@ -125,13 +129,13 @@ ERROR
   local extracted
   extracted="$(find "$tmp_source_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 
-  if [[ -z "$extracted" || ! -d "$extracted/orchestrator" || ! -d "$extracted/templates" ]]; then
-    echo "install.sh: downloaded repo does not contain orchestrator/ and templates/" >&2
+  if [[ -z "$extracted" || ! -d "$extracted/orchestrator" || ! -d "$extracted/skills/multi-model-orchestrator" ]]; then
+    echo "install.sh: downloaded repo does not contain orchestrator/ and skills/multi-model-orchestrator/" >&2
     exit 1
   fi
 
   source_dir="$extracted/orchestrator"
-  template_dir="$extracted/templates"
+  skill_source_dir="$extracted/skills/multi-model-orchestrator"
 }
 
 render_template() {
@@ -141,7 +145,7 @@ render_template() {
   printf '%s' "${content//\{\{AI_ORCHESTRATOR_DIR\}\}/$target_dir}"
 }
 
-if [[ ! -d "$source_dir" || ! -d "$template_dir" ]]; then
+if [[ ! -d "$source_dir" || ! -d "$skill_source_dir" ]]; then
   download_remote_source
 fi
 
@@ -160,28 +164,12 @@ chmod +x "$install_dir"/bin/*
 render_template "$source_dir/AGENT_RULES.md" > "$install_dir/AGENT_RULES.md"
 render_template "$source_dir/config.example.yml" > "$install_dir/config.example.yml"
 
-install_template() {
-  local template_name="$1"
-  local destination="$target_project/$template_name"
-  local rendered
-
-  if [[ -e "$destination" && "$force_agent_files" -ne 1 ]]; then
-    local suggestion="$target_project/${template_name%.md}.ai-orchestrator.md"
-    rendered="$(render_template "$template_dir/$template_name")"
-    printf '%s\n' "$rendered" > "$suggestion"
-    echo "Kept existing $template_name; wrote suggested shim to ${suggestion#$target_project/}"
-    return
-  fi
-
-  rendered="$(render_template "$template_dir/$template_name")"
-  printf '%s\n' "$rendered" > "$destination"
-  echo "Installed $template_name"
-}
-
-install_template "CLAUDE.md"
-
-if [[ "$with_gemini_md" -eq 1 ]]; then
-  install_template "GEMINI.md"
+if [[ "$install_skill" -eq 1 ]]; then
+  skill_install_dir="$target_project/$skill_dir/multi-model-orchestrator"
+  mkdir -p "$skill_install_dir"
+  cp -R "$skill_source_dir"/. "$skill_install_dir"/
+  render_template "$skill_source_dir/SKILL.md" > "$skill_install_dir/SKILL.md"
+  echo "Installed Claude skill to ${skill_install_dir#$target_project/}"
 fi
 
 echo "Installed AI Orchestrator to ${install_dir#$target_project/}"

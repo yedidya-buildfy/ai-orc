@@ -67,6 +67,8 @@ Use when the user explicitly wants Gemini to generate a bitmap image asset throu
 
 This tool may create one image file at the requested output path. It should not edit code or unrelated files.
 
+If the user asks for "nano banana", "nano-banana", or another Gemini image model/profile, use this same `gemini-image` wrapper. Treat those names as routing hints for Gemini image generation, not as separate commands.
+
 Example:
 
 ```bash
@@ -77,16 +79,6 @@ If Gemini's internal image generation MCP is blocked by permissions, retry with 
 
 ```bash
 {{AI_ORCHESTRATOR_DIR}}/bin/gemini-image --yolo --prompt "A clean product mockup of a CLI orchestration dashboard" --output generated-images/orchestrator-dashboard.png
-```
-
-### `{{AI_ORCHESTRATOR_DIR}}/bin/nano-banana-image`
-
-Use when the user asks for "nano banana" image generation. This is a Gemini image-generation profile that delegates to `gemini-image --yolo`.
-
-Example:
-
-```bash
-{{AI_ORCHESTRATOR_DIR}}/bin/nano-banana-image --prompt "An astronaut cat floating in space" --output generated-images/astronaut-cat.png
 ```
 
 ### `{{AI_ORCHESTRATOR_DIR}}/bin/codex-image`
@@ -105,8 +97,7 @@ Example:
 
 - Code review, bugs, repo-aware analysis: `{{AI_ORCHESTRATOR_DIR}}/bin/codex-review`
 - General reasoning or product/architecture tradeoffs: `{{AI_ORCHESTRATOR_DIR}}/bin/ask-gemini`
-- Gemini-generated image assets: `{{AI_ORCHESTRATOR_DIR}}/bin/gemini-image`
-- Nano-banana image requests: `{{AI_ORCHESTRATOR_DIR}}/bin/nano-banana-image`
+- Gemini-generated image assets, including nano-banana or other Gemini image-model requests: `{{AI_ORCHESTRATOR_DIR}}/bin/gemini-image`
 - Codex/OpenAI-generated image assets: `{{AI_ORCHESTRATOR_DIR}}/bin/codex-image`
 
 ## When To Consult
@@ -146,7 +137,6 @@ Output format:
 - Do not ask consult tools to write files, run migrations, install dependencies, or apply patches.
 - `{{AI_ORCHESTRATOR_DIR}}/bin/gemini-image` may write exactly one generated image file to the requested output path.
 - `{{AI_ORCHESTRATOR_DIR}}/bin/gemini-image --yolo` is allowed only for explicit image-generation requests, especially when Gemini's image MCP requires full approval.
-- `{{AI_ORCHESTRATOR_DIR}}/bin/nano-banana-image` is a Gemini image-generation alias and may write exactly one generated image file to the requested output path.
 - `{{AI_ORCHESTRATOR_DIR}}/bin/codex-image` may write exactly one generated image file to the requested output path.
 - Do not chain tools by sending one model's raw output into another model unless the user explicitly requests comparison.
 - Do not use act/execution mode until an explicit act workflow exists and the user approves that behavior.
