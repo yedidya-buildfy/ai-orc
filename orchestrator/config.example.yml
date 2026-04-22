@@ -1,0 +1,40 @@
+version: 1
+
+install:
+  target_dir: "{{AI_ORCHESTRATOR_DIR}}"
+  write_claude_md: true
+  write_gemini_md: false
+  overwrite_existing_agent_files: false
+
+tools:
+  codex_review:
+    command: "{{AI_ORCHESTRATOR_DIR}}/bin/codex-review"
+    mode: consult
+    default: true
+
+  ask_gemini:
+    command: "{{AI_ORCHESTRATOR_DIR}}/bin/ask-gemini"
+    mode: consult
+    default: true
+
+  gemini_image:
+    command: "{{AI_ORCHESTRATOR_DIR}}/bin/gemini-image"
+    mode: asset_generation
+    yolo_on_permission_block: true
+
+  nano_banana_image:
+    command: "{{AI_ORCHESTRATOR_DIR}}/bin/nano-banana-image"
+    mode: asset_generation
+    provider: gemini
+    yolo: true
+
+  codex_image:
+    command: "{{AI_ORCHESTRATOR_DIR}}/bin/codex-image"
+    mode: asset_generation
+    preferred_image_model: gpt-image-1.5
+
+policy:
+  max_external_tools_by_default: 1
+  consult_is_read_only: true
+  require_explicit_user_request_for_image_generation: true
+  require_explicit_user_approval_for_act_mode: true

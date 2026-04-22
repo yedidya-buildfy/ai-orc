@@ -1,0 +1,26 @@
+{
+  "name": "ai-orchestrator",
+  "version": "0.1.0",
+  "description": "Reusable local CLI orchestration for Claude Code, Codex, Gemini, and image-generation workflows.",
+  "license": "MIT",
+  "bin": {
+    "ai-orchestrator": "npm/bin/ai-orchestrator"
+  },
+  "files": [
+    "orchestrator",
+    "templates",
+    "skills",
+    "install.sh",
+    "npm/bin/ai-orchestrator",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "claude-code",
+    "codex",
+    "gemini",
+    "ai-agents",
+    "orchestration"
+  ]
+}
+

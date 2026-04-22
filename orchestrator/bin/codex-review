@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  bin/codex-review --prompt "review request" [--cwd /path/to/repo] [--model MODEL]
+  echo "review request" | bin/codex-review [--cwd /path/to/repo]
+
+Purpose:
+  Run a repo-aware, consult-only Codex review in a read-only sandbox.
+
+Options:
+  --prompt, -p       Review prompt.
+  --prompt-file      Read the review prompt from a file.
+  --cwd              Working directory to inspect. Defaults to current directory.
+  --model, -m        Optional Codex model override.
+  --help, -h         Show this help.
+USAGE
+}
+
+cwd="$PWD"
+prompt=""
+model=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --prompt|-p)
+      if [[ $# -lt 2 ]]; then
+        echo "codex-review: --prompt requires a value" >&2
+        exit 2
+      fi
+      prompt="$2"
+      shift 2
+      ;;
+    --prompt-file)
+      if [[ $# -lt 2 ]]; then
+        echo "codex-review: --prompt-file requires a value" >&2
+        exit 2
+      fi
+      prompt="$(cat "$2")"
+      shift 2
+      ;;
+    --cwd)
+      if [[ $# -lt 2 ]]; then
+        echo "codex-review: --cwd requires a value" >&2
+        exit 2
+      fi
+      cwd="$2"
+      shift 2
+      ;;
+    --model|-m)
+      if [[ $# -lt 2 ]]; then
+        echo "codex-review: --model requires a value" >&2
+        exit 2
+      fi
+      model="$2"
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "codex-review: unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "${prompt//[[:space:]]/}" && ! -t 0 ]]; then
+  prompt="$(cat)"
+fi
+
+if [[ -z "${prompt//[[:space:]]/}" ]]; then
+  echo "codex-review: provide a prompt with --prompt, --prompt-file, or stdin" >&2
+  exit 2
+fi
+
+if [[ ! -d "$cwd" ]]; then
+  echo "codex-review: --cwd is not a directory: $cwd" >&2
+  exit 2
+fi
+
+if ! command -v codex >/dev/null 2>&1; then
+  echo "codex-review: codex CLI not found on PATH" >&2
+  exit 127
+fi
+
+cwd="$(cd "$cwd" && pwd -P)"
+
+read -r -d '' full_prompt <<EOF || true
+You are acting as a consult-only code reviewer for a local repository.
+
+Constraints:
+- Read files as needed.
+- Do not edit, create, delete, move, or format files.
+- Do not install dependencies.
+- Do not run destructive commands.
+- Do not attempt to apply patches.
+- Return concise, actionable review findings.
+
+Output format:
+Findings:
+- Severity:
+- Location:
+- Issue:
+- Recommendation:
+
+Open questions:
+
+Confidence:
+
+User request:
+$prompt
+EOF
+
+args=(exec --sandbox read-only --skip-git-repo-check --ephemeral --color never -C "$cwd")
+
+if [[ -n "$model" ]]; then
+  args+=(-m "$model")
+fi
+
+printf '%s\n' "$full_prompt" | codex "${args[@]}" -

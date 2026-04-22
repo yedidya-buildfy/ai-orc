@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  bin/ask-gemini --prompt "question" [--cwd /path/to/repo] [--model MODEL]
+  echo "question" | bin/ask-gemini [--cwd /path/to/repo]
+
+Purpose:
+  Ask Gemini for consult-only reasoning. The prompt explicitly forbids edits and
+  auto-approval is not enabled.
+
+Options:
+  --prompt, -p       Consultation prompt.
+  --prompt-file      Read the prompt from a file.
+  --cwd              Working directory for context. Defaults to current directory.
+  --model, -m        Optional Gemini model override.
+  --no-sandbox       Do not pass Gemini's --sandbox flag.
+  --help, -h         Show this help.
+USAGE
+}
+
+cwd="$PWD"
+prompt=""
+model=""
+use_sandbox=1
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --prompt|-p)
+      if [[ $# -lt 2 ]]; then
+        echo "ask-gemini: --prompt requires a value" >&2
+        exit 2
+      fi
+      prompt="$2"
+      shift 2
+      ;;
+    --prompt-file)
+      if [[ $# -lt 2 ]]; then
+        echo "ask-gemini: --prompt-file requires a value" >&2
+        exit 2
+      fi
+      prompt="$(cat "$2")"
+      shift 2
+      ;;
+    --cwd)
+      if [[ $# -lt 2 ]]; then
+        echo "ask-gemini: --cwd requires a value" >&2
+        exit 2
+      fi
+      cwd="$2"
+      shift 2
+      ;;
+    --model|-m)
+      if [[ $# -lt 2 ]]; then
+        echo "ask-gemini: --model requires a value" >&2
+        exit 2
+      fi
+      model="$2"
+      shift 2
+      ;;
+    --no-sandbox)
+      use_sandbox=0
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "ask-gemini: unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "${prompt//[[:space:]]/}" && ! -t 0 ]]; then
+  prompt="$(cat)"
+fi
+
+if [[ -z "${prompt//[[:space:]]/}" ]]; then
+  echo "ask-gemini: provide a prompt with --prompt, --prompt-file, or stdin" >&2
+  exit 2
+fi
+
+if [[ ! -d "$cwd" ]]; then
+  echo "ask-gemini: --cwd is not a directory: $cwd" >&2
+  exit 2
+fi
+
+if ! command -v gemini >/dev/null 2>&1; then
+  echo "ask-gemini: gemini CLI not found on PATH" >&2
+  exit 127
+fi
+
+cwd="$(cd "$cwd" && pwd -P)"
+
+read -r -d '' full_prompt <<EOF || true
+You are acting as a consult-only reasoning helper.
+
+Constraints:
+- Do not edit, create, delete, move, or format files.
+- Do not install dependencies.
+- Do not run destructive commands.
+- Do not apply patches.
+- Give a concise answer that Claude can use to decide what to do next.
+
+Output format:
+Recommendation:
+Reasoning:
+Risks:
+Open questions:
+Confidence:
+
+User request:
+$prompt
+EOF
+
+args=(--approval-mode default --output-format text)
+
+if [[ "$use_sandbox" -eq 1 ]]; then
+  args+=(--sandbox)
+fi
+
+if [[ -n "$model" ]]; then
+  args+=(-m "$model")
+fi
+
+(
+  cd "$cwd"
+  gemini "${args[@]}" "$full_prompt"
+)

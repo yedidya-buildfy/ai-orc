@@ -1,0 +1,312 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  bin/gemini-image --prompt "image prompt" [--output generated-images/name.png]
+  echo "image prompt" | bin/gemini-image --output generated-images/name.png
+
+Purpose:
+  Ask Gemini to generate an image through any configured Gemini CLI media/image
+  generation capability, such as a media-generation MCP server.
+
+Options:
+  --prompt, -p       Image generation prompt.
+  --prompt-file      Read the image prompt from a file.
+  --output, -o       Output image path. Must be inside --cwd. Defaults to generated-images/gemini-image-<timestamp>.png.
+  --cwd              Working directory. Defaults to current directory.
+  --model, -m        Optional Gemini model override.
+  --aspect-ratio     Optional aspect ratio instruction, for example 1:1, 16:9, 4:3, 9:16.
+  --style            Optional style instruction.
+  --reference        Optional reference file path. Repeatable.
+  --mcp-server       Optional Gemini MCP server name to allow, for example genmedia.
+  --yolo             Pass Gemini --yolo and skip Gemini sandbox for image MCP flows that require full tool approval.
+  --no-sandbox       Do not pass Gemini's --sandbox flag.
+  --overwrite        Allow replacing an existing output file.
+  --dry-run          Print the resolved Gemini prompt and exit without invoking Gemini.
+  --help, -h         Show this help.
+USAGE
+}
+
+cwd="$PWD"
+prompt=""
+output=""
+model=""
+aspect_ratio=""
+style=""
+mcp_server=""
+use_sandbox=1
+yolo=0
+overwrite=0
+dry_run=0
+references=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --prompt|-p)
+      if [[ $# -lt 2 ]]; then
+        echo "gemini-image: --prompt requires a value" >&2
+        exit 2
+      fi
+      prompt="$2"
+      shift 2
+      ;;
+    --prompt-file)
+      if [[ $# -lt 2 ]]; then
+        echo "gemini-image: --prompt-file requires a value" >&2
+        exit 2
+      fi
+      prompt="$(cat "$2")"
+      shift 2
+      ;;
+    --output|-o)
+      if [[ $# -lt 2 ]]; then
+        echo "gemini-image: --output requires a value" >&2
+        exit 2
+      fi
+      output="$2"
+      shift 2
+      ;;
+    --cwd)
+      if [[ $# -lt 2 ]]; then
+        echo "gemini-image: --cwd requires a value" >&2
+        exit 2
+      fi
+      cwd="$2"
+      shift 2
+      ;;
+    --model|-m)
+      if [[ $# -lt 2 ]]; then
+        echo "gemini-image: --model requires a value" >&2
+        exit 2
+      fi
+      model="$2"
+      shift 2
+      ;;
+    --aspect-ratio)
+      if [[ $# -lt 2 ]]; then
+        echo "gemini-image: --aspect-ratio requires a value" >&2
+        exit 2
+      fi
+      aspect_ratio="$2"
+      shift 2
+      ;;
+    --style)
+      if [[ $# -lt 2 ]]; then
+        echo "gemini-image: --style requires a value" >&2
+        exit 2
+      fi
+      style="$2"
+      shift 2
+      ;;
+    --reference)
+      if [[ $# -lt 2 ]]; then
+        echo "gemini-image: --reference requires a value" >&2
+        exit 2
+      fi
+      references+=("$2")
+      shift 2
+      ;;
+    --mcp-server)
+      if [[ $# -lt 2 ]]; then
+        echo "gemini-image: --mcp-server requires a value" >&2
+        exit 2
+      fi
+      mcp_server="$2"
+      shift 2
+      ;;
+    --no-sandbox)
+      use_sandbox=0
+      shift
+      ;;
+    --yolo)
+      yolo=1
+      shift
+      ;;
+    --overwrite)
+      overwrite=1
+      shift
+      ;;
+    --dry-run)
+      dry_run=1
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "gemini-image: unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "${prompt//[[:space:]]/}" && ! -t 0 ]]; then
+  prompt="$(cat)"
+fi
+
+if [[ "$yolo" -eq 1 ]]; then
+  use_sandbox=0
+fi
+
+if [[ -z "${prompt//[[:space:]]/}" ]]; then
+  echo "gemini-image: provide a prompt with --prompt, --prompt-file, or stdin" >&2
+  exit 2
+fi
+
+if [[ ! -d "$cwd" ]]; then
+  echo "gemini-image: --cwd is not a directory: $cwd" >&2
+  exit 2
+fi
+
+if ! command -v gemini >/dev/null 2>&1; then
+  echo "gemini-image: gemini CLI not found on PATH" >&2
+  exit 127
+fi
+
+cwd="$(cd "$cwd" && pwd -P)"
+
+if [[ -z "$output" ]]; then
+  output="generated-images/gemini-image-$(date +%Y%m%d-%H%M%S).png"
+fi
+
+case "$output" in
+  *.png|*.jpg|*.jpeg|*.webp) ;;
+  *)
+    echo "gemini-image: --output must end with .png, .jpg, .jpeg, or .webp" >&2
+    exit 2
+    ;;
+esac
+
+if [[ "$output" = /* ]]; then
+  output_path="$output"
+else
+  output_path="$cwd/$output"
+fi
+
+output_dir="$(dirname "$output_path")"
+if [[ "$dry_run" -eq 1 ]]; then
+  case "$output_path" in
+    "$cwd"/*) ;;
+    *)
+      echo "gemini-image: --output must resolve inside --cwd" >&2
+      exit 2
+      ;;
+  esac
+  output_file="$output_path"
+else
+  mkdir -p "$output_dir"
+  output_dir="$(cd "$output_dir" && pwd -P)"
+  output_file="$output_dir/$(basename "$output_path")"
+
+  case "$output_dir/" in
+    "$cwd"/*|"$cwd/") ;;
+    *)
+      echo "gemini-image: --output must resolve inside --cwd" >&2
+      exit 2
+      ;;
+  esac
+
+  if [[ -e "$output_file" && "$overwrite" -ne 1 ]]; then
+    echo "gemini-image: output already exists; pass --overwrite to replace: $output_file" >&2
+    exit 2
+  fi
+fi
+
+reference_text="None."
+if [[ "${#references[@]}" -gt 0 ]]; then
+  reference_text=""
+  for reference in "${references[@]}"; do
+    if [[ "$reference" = /* ]]; then
+      reference_path="$reference"
+    else
+      reference_path="$cwd/$reference"
+    fi
+
+    if [[ ! -f "$reference_path" ]]; then
+      echo "gemini-image: reference file not found: $reference" >&2
+      exit 2
+    fi
+
+    reference_text+="- $reference_path"$'\n'
+  done
+fi
+
+aspect_text="Not specified."
+if [[ -n "$aspect_ratio" ]]; then
+  aspect_text="$aspect_ratio"
+fi
+
+style_text="Not specified."
+if [[ -n "$style" ]]; then
+  style_text="$style"
+fi
+
+read -r -d '' full_prompt <<EOF || true
+You are generating a bitmap image asset for Claude Code.
+
+Task:
+Generate exactly one image from the user's prompt and save it to this exact path:
+$output_file
+
+Requirements:
+- Use the available Gemini CLI media/image generation capability.
+- If an MCP image/media generation tool is available, use it.
+- Save the final image file at the exact path above.
+- Do not edit source code or unrelated files.
+- Do not create placeholder text files.
+- Do not create an HTML/SVG substitute unless the user explicitly requested vector art.
+- If image generation capability is unavailable, say that clearly and do not create a fake output.
+- After generation, respond with only:
+  OUTPUT: $output_file
+
+Image prompt:
+$prompt
+
+Aspect ratio:
+$aspect_text
+
+Style:
+$style_text
+
+Reference files:
+$reference_text
+EOF
+
+if [[ "$dry_run" -eq 1 ]]; then
+  printf '%s\n' "$full_prompt"
+  exit 0
+fi
+
+if [[ "$yolo" -eq 1 ]]; then
+  args=(--yolo --output-format text)
+else
+  args=(--approval-mode auto_edit --output-format text)
+fi
+
+if [[ "$use_sandbox" -eq 1 ]]; then
+  args+=(--sandbox)
+fi
+
+if [[ -n "$model" ]]; then
+  args+=(-m "$model")
+fi
+
+if [[ -n "$mcp_server" ]]; then
+  args+=(--allowed-mcp-server-names "$mcp_server")
+fi
+
+(
+  cd "$cwd"
+  gemini "${args[@]}" "$full_prompt"
+)
+
+if [[ ! -s "$output_file" ]]; then
+  echo "gemini-image: Gemini finished but no non-empty output file exists at: $output_file" >&2
+  exit 1
+fi
+
+printf 'OUTPUT: %s\n' "$output_file"

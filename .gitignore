@@ -1,0 +1,9 @@
+.ai-orchestrator/
+generated-images/
+book_images/
+mombook1/
+prd.md
+storry1.md
+*.tgz
+npm-debug.log*
+.DS_Store

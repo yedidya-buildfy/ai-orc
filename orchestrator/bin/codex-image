@@ -1,0 +1,312 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  bin/codex-image --prompt "image prompt" [--output generated-images/name.png]
+  echo "image prompt" | bin/codex-image --output generated-images/name.png
+
+Purpose:
+  Ask Codex to generate a bitmap image through its available OpenAI image
+  generation capability and save exactly one image asset.
+
+Options:
+  --prompt, -p       Image generation prompt.
+  --prompt-file      Read the image prompt from a file.
+  --output, -o       Output image path. Must be inside --cwd. Defaults to generated-images/codex-image-<timestamp>.png.
+  --cwd              Working directory. Defaults to current directory.
+  --model, -m        Optional Codex agent model override.
+  --image-model      Optional preferred OpenAI image model instruction.
+  --size             Optional size instruction, for example 1024x1024, 1536x1024, 1024x1536.
+  --aspect-ratio     Optional aspect ratio instruction, for example 1:1, 16:9, 4:3, 9:16.
+  --style            Optional style instruction.
+  --reference        Optional reference image path. Repeatable.
+  --overwrite        Allow replacing an existing output file.
+  --dry-run          Print the resolved Codex prompt and exit without invoking Codex.
+  --help, -h         Show this help.
+USAGE
+}
+
+cwd="$PWD"
+prompt=""
+output=""
+model=""
+image_model=""
+size=""
+aspect_ratio=""
+style=""
+overwrite=0
+dry_run=0
+references=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --prompt|-p)
+      if [[ $# -lt 2 ]]; then
+        echo "codex-image: --prompt requires a value" >&2
+        exit 2
+      fi
+      prompt="$2"
+      shift 2
+      ;;
+    --prompt-file)
+      if [[ $# -lt 2 ]]; then
+        echo "codex-image: --prompt-file requires a value" >&2
+        exit 2
+      fi
+      prompt="$(cat "$2")"
+      shift 2
+      ;;
+    --output|-o)
+      if [[ $# -lt 2 ]]; then
+        echo "codex-image: --output requires a value" >&2
+        exit 2
+      fi
+      output="$2"
+      shift 2
+      ;;
+    --cwd)
+      if [[ $# -lt 2 ]]; then
+        echo "codex-image: --cwd requires a value" >&2
+        exit 2
+      fi
+      cwd="$2"
+      shift 2
+      ;;
+    --model|-m)
+      if [[ $# -lt 2 ]]; then
+        echo "codex-image: --model requires a value" >&2
+        exit 2
+      fi
+      model="$2"
+      shift 2
+      ;;
+    --image-model)
+      if [[ $# -lt 2 ]]; then
+        echo "codex-image: --image-model requires a value" >&2
+        exit 2
+      fi
+      image_model="$2"
+      shift 2
+      ;;
+    --size)
+      if [[ $# -lt 2 ]]; then
+        echo "codex-image: --size requires a value" >&2
+        exit 2
+      fi
+      size="$2"
+      shift 2
+      ;;
+    --aspect-ratio)
+      if [[ $# -lt 2 ]]; then
+        echo "codex-image: --aspect-ratio requires a value" >&2
+        exit 2
+      fi
+      aspect_ratio="$2"
+      shift 2
+      ;;
+    --style)
+      if [[ $# -lt 2 ]]; then
+        echo "codex-image: --style requires a value" >&2
+        exit 2
+      fi
+      style="$2"
+      shift 2
+      ;;
+    --reference)
+      if [[ $# -lt 2 ]]; then
+        echo "codex-image: --reference requires a value" >&2
+        exit 2
+      fi
+      references+=("$2")
+      shift 2
+      ;;
+    --overwrite)
+      overwrite=1
+      shift
+      ;;
+    --dry-run)
+      dry_run=1
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "codex-image: unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "${prompt//[[:space:]]/}" && ! -t 0 ]]; then
+  prompt="$(cat)"
+fi
+
+if [[ -z "${prompt//[[:space:]]/}" ]]; then
+  echo "codex-image: provide a prompt with --prompt, --prompt-file, or stdin" >&2
+  exit 2
+fi
+
+if [[ ! -d "$cwd" ]]; then
+  echo "codex-image: --cwd is not a directory: $cwd" >&2
+  exit 2
+fi
+
+if ! command -v codex >/dev/null 2>&1; then
+  echo "codex-image: codex CLI not found on PATH" >&2
+  exit 127
+fi
+
+cwd="$(cd "$cwd" && pwd -P)"
+
+if [[ -z "$output" ]]; then
+  output="generated-images/codex-image-$(date +%Y%m%d-%H%M%S).png"
+fi
+
+case "$output" in
+  *.png|*.jpg|*.jpeg|*.webp) ;;
+  *)
+    echo "codex-image: --output must end with .png, .jpg, .jpeg, or .webp" >&2
+    exit 2
+    ;;
+esac
+
+if [[ "$output" = /* ]]; then
+  output_path="$output"
+else
+  output_path="$cwd/$output"
+fi
+
+output_dir="$(dirname "$output_path")"
+if [[ "$dry_run" -eq 1 ]]; then
+  case "$output_path" in
+    "$cwd"/*) ;;
+    *)
+      echo "codex-image: --output must resolve inside --cwd" >&2
+      exit 2
+      ;;
+  esac
+  output_file="$output_path"
+else
+  mkdir -p "$output_dir"
+  output_dir="$(cd "$output_dir" && pwd -P)"
+  output_file="$output_dir/$(basename "$output_path")"
+
+  case "$output_dir/" in
+    "$cwd"/*|"$cwd/") ;;
+    *)
+      echo "codex-image: --output must resolve inside --cwd" >&2
+      exit 2
+      ;;
+  esac
+
+  if [[ -e "$output_file" && "$overwrite" -ne 1 ]]; then
+    echo "codex-image: output already exists; pass --overwrite to replace: $output_file" >&2
+    exit 2
+  fi
+fi
+
+image_model_text="Use gpt-image-1.5 if available; otherwise use the OpenAI image generation model available to Codex."
+if [[ -n "$image_model" ]]; then
+  image_model_text="$image_model"
+fi
+
+size_text="Not specified."
+if [[ -n "$size" ]]; then
+  size_text="$size"
+fi
+
+aspect_text="Not specified."
+if [[ -n "$aspect_ratio" ]]; then
+  aspect_text="$aspect_ratio"
+fi
+
+style_text="Not specified."
+if [[ -n "$style" ]]; then
+  style_text="$style"
+fi
+
+reference_text="None."
+codex_images=()
+if [[ "${#references[@]}" -gt 0 ]]; then
+  reference_text=""
+  for reference in "${references[@]}"; do
+    if [[ "$reference" = /* ]]; then
+      reference_path="$reference"
+    else
+      reference_path="$cwd/$reference"
+    fi
+
+    if [[ ! -f "$reference_path" ]]; then
+      echo "codex-image: reference file not found: $reference" >&2
+      exit 2
+    fi
+
+    reference_path="$(cd "$(dirname "$reference_path")" && pwd -P)/$(basename "$reference_path")"
+    reference_text+="- $reference_path"$'\n'
+    codex_images+=(-i "$reference_path")
+  done
+fi
+
+read -r -d '' full_prompt <<EOF || true
+You are generating a bitmap image asset for Claude Code.
+
+Task:
+Use Codex's available OpenAI image-generation capability to generate exactly one image and save it to this exact path:
+$output_file
+
+Requirements:
+- Generate a real bitmap image file, not SVG, HTML, Markdown, or a text placeholder.
+- Save the final image at the exact path above.
+- Do not edit source code or unrelated files.
+- Do not create more than one output image.
+- If image generation capability is unavailable in this Codex session, say that clearly and do not create a fake output.
+- After generation, respond with only:
+  OUTPUT: $output_file
+
+Preferred image model:
+$image_model_text
+
+Image prompt:
+$prompt
+
+Size:
+$size_text
+
+Aspect ratio:
+$aspect_text
+
+Style:
+$style_text
+
+Reference images:
+$reference_text
+EOF
+
+if [[ "$dry_run" -eq 1 ]]; then
+  printf '%s\n' "$full_prompt"
+  exit 0
+fi
+
+args=(exec --sandbox workspace-write --skip-git-repo-check --ephemeral --color never -C "$cwd")
+
+if [[ -n "$model" ]]; then
+  args+=(-m "$model")
+fi
+
+if [[ "${#codex_images[@]}" -gt 0 ]]; then
+  args+=("${codex_images[@]}")
+fi
+
+printf '%s\n' "$full_prompt" | codex "${args[@]}" -
+
+if [[ ! -s "$output_file" ]]; then
+  echo "codex-image: Codex finished but no non-empty output file exists at: $output_file" >&2
+  exit 1
+fi
+
+printf 'OUTPUT: %s\n' "$output_file"

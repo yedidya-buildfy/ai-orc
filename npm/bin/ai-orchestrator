@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+package_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+
+if [[ "${1:-}" == "install" ]]; then
+  shift
+fi
+
+exec "$package_dir/install.sh" "$@"
