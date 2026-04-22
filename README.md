@@ -82,6 +82,23 @@ This installs:
 /path/to/project/.claude/skills/multi-model-orchestrator/SKILL.md
 ```
 
+## Install Globally
+
+If you want Claude Code to have the skill available across projects, install global wrappers and a global Claude skill:
+
+```bash
+npx --package @yedidya-dan/ai-orc ai-orc install --global
+```
+
+This installs:
+
+```text
+~/.ai-orchestrator/
+~/.claude/skills/multi-model-orchestrator/SKILL.md
+```
+
+The global skill points at absolute wrapper paths under `~/.ai-orchestrator`, so it can work from any project. This does not change Codex or Gemini themselves; the wrappers still rely on the user's existing local CLI logins.
+
 Install only the wrappers, without the Claude skill:
 
 ```bash

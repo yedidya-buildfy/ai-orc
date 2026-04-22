@@ -7,6 +7,7 @@ Usage:
   ./install.sh [target-project] [options]
 
 Options:
+  --global                Install global wrappers and Claude skill under $HOME.
   --target-dir NAME       Install toolkit into NAME. Default: .ai-orchestrator
   --skill-dir NAME        Install the Claude skill into NAME. Default: .claude/skills
   --no-skill              Do not install the Claude skill.
@@ -16,6 +17,7 @@ Options:
 
 Examples:
   ./install.sh /path/to/project
+  ./install.sh --global
   ./install.sh /path/to/project --target-dir .tools/ai-orchestrator
   ./install.sh /path/to/project --skill-dir .claude/skills
   curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash -s -- . --repo OWNER/REPO
@@ -26,11 +28,16 @@ target_project="."
 target_dir=".ai-orchestrator"
 skill_dir=".claude/skills"
 install_skill=1
+global_install=0
 remote_repo="${AI_ORCHESTRATOR_REPO:-}"
 remote_ref="${AI_ORCHESTRATOR_REF:-main}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --global)
+      global_install=1
+      shift
+      ;;
     --target-dir)
       if [[ $# -lt 2 ]]; then
         echo "install.sh: --target-dir requires a value" >&2
@@ -142,11 +149,21 @@ render_template() {
   local template_path="$1"
   local content
   content="$(<"$template_path")"
-  printf '%s' "${content//\{\{AI_ORCHESTRATOR_DIR\}\}/$target_dir}"
+  printf '%s' "${content//\{\{AI_ORCHESTRATOR_DIR\}\}/$orchestrator_ref}"
 }
 
 if [[ ! -d "$source_dir" || ! -d "$skill_source_dir" ]]; then
   download_remote_source
+fi
+
+if [[ "$global_install" -eq 1 ]]; then
+  if [[ -z "${HOME:-}" ]]; then
+    echo "install.sh: HOME is required for --global" >&2
+    exit 2
+  fi
+  target_project="$HOME"
+  target_dir=".ai-orchestrator"
+  skill_dir=".claude/skills"
 fi
 
 if [[ ! -d "$target_project" ]]; then
@@ -156,6 +173,11 @@ fi
 
 target_project="$(cd "$target_project" && pwd -P)"
 install_dir="$target_project/$target_dir"
+orchestrator_ref="$target_dir"
+
+if [[ "$global_install" -eq 1 ]]; then
+  orchestrator_ref="$install_dir"
+fi
 
 mkdir -p "$install_dir"
 cp -R "$source_dir"/. "$install_dir"/
@@ -169,8 +191,17 @@ if [[ "$install_skill" -eq 1 ]]; then
   mkdir -p "$skill_install_dir"
   cp -R "$skill_source_dir"/. "$skill_install_dir"/
   render_template "$skill_source_dir/SKILL.md" > "$skill_install_dir/SKILL.md"
-  echo "Installed Claude skill to ${skill_install_dir#$target_project/}"
+  if [[ "$global_install" -eq 1 ]]; then
+    echo "Installed global Claude skill to $skill_install_dir"
+  else
+    echo "Installed Claude skill to ${skill_install_dir#$target_project/}"
+  fi
 fi
 
-echo "Installed AI Orchestrator to ${install_dir#$target_project/}"
-echo "Try: ${target_dir}/bin/codex-review --prompt \"Review this project setup.\""
+if [[ "$global_install" -eq 1 ]]; then
+  echo "Installed global AI Orchestrator to $install_dir"
+  echo "Try: $install_dir/bin/codex-review --prompt \"Review this project setup.\""
+else
+  echo "Installed AI Orchestrator to ${install_dir#$target_project/}"
+  echo "Try: ${target_dir}/bin/codex-review --prompt \"Review this project setup.\""
+fi
