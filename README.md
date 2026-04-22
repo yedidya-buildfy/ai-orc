@@ -74,6 +74,12 @@ Future npm flow after publishing:
 npx @yedidya-dan/ai-orc install .
 ```
 
+Equivalent explicit binary form:
+
+```bash
+npx --package @yedidya-dan/ai-orc ai-orc install .
+```
+
 This installs:
 
 ```text

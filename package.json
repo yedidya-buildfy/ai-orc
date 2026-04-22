@@ -1,9 +1,10 @@
 {
   "name": "@yedidya-dan/ai-orc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Reusable local CLI orchestration for Claude Code, Codex, Gemini, and image-generation workflows.",
   "license": "MIT",
   "bin": {
+    "ai-orc": "npm/bin/ai-orchestrator",
     "ai-orchestrator": "npm/bin/ai-orchestrator"
   },
   "repository": {
