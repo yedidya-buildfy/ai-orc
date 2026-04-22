@@ -1,11 +1,19 @@
 {
-  "name": "ai-orchestrator",
+  "name": "@yedidya-dan/ai-orc",
   "version": "0.1.0",
   "description": "Reusable local CLI orchestration for Claude Code, Codex, Gemini, and image-generation workflows.",
   "license": "MIT",
   "bin": {
     "ai-orchestrator": "npm/bin/ai-orchestrator"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yedidya-buildfy/ai-orc.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yedidya-buildfy/ai-orc/issues"
+  },
+  "homepage": "https://github.com/yedidya-buildfy/ai-orc#readme",
   "files": [
     "orchestrator",
     "templates",
@@ -23,4 +31,3 @@
     "orchestration"
   ]
 }
-

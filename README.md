@@ -71,7 +71,7 @@ curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash -
 Future npm flow after publishing:
 
 ```bash
-npx ai-orchestrator install .
+npx @yedidya-dan/ai-orc install .
 ```
 
 This installs:
@@ -176,7 +176,7 @@ The root `bin/` directory is kept as a compatibility alias while the package mat
 3. Add a guarded `codex-act` workflow with explicit user approval.
 4. Add a config-aware router command.
 5. Publish as a GitHub repo with an install URL.
-6. Publish an npm package for `npx ai-orchestrator install .`.
+6. Publish an npm package for `npx @yedidya-dan/ai-orc install .`.
 
 ## Publishing Checklist
 
